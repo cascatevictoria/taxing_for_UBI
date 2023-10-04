@@ -1,0 +1,383 @@
+---
+title: "Taxing for Universal Basic Income"
+author: "Victoria Bolotova"
+date: "19 06 2021"
+output: 
+    html_document:
+      theme: cosmo
+      code_folding: show
+      toc: true
+      toc_float: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+```
+
+**Running libraries**
+
+```{r}
+library(tidyverse)
+library(foreign)
+library(reldist)
+library(IC2)
+library(kableExtra)
+library(dplyr)
+
+```
+
+**Reading data**
+
+For this project I am eager to work with real data from *European Social Survey*. I hope it is worth it as the sample is representative, although I do not know the income of every person in some particular country.
+
+```{r}
+data_1 <- read.spss("ESS9e03.1_F1.sav", 
+                 use.value.labels = T, to.data.frame = T)
+```
+
+**Filtering data**
+
+I have decided to work with eight countries for which I have different expectations. They are Finland, Sweden, Denmark, Slovenia, Germany, United Kingdom, Bulgaria, Spain. Finland, Sweden and Denmark are considered to be social democratic type of welfare state, so I expect law or medium Gini coefficients for them as well as for Slovenia according to what I found in the Internet about this country. In contrast, I guess that the most big Gini coefficien will be for United Kingdom, Spain (there are corruption issues and high ineqiality in Southern Spain) and the medium are for Bulgaria and Germany. 
+
+```{r}
+data_2 <- data_1 %>%
+  select(cntry, netinum) %>%
+  filter(cntry %in% c("Finland", "Sweden", "Denmark", "Slovenia", "Germany",
+                    "United Kingdom", "Bulgaria", "Spain"))
+
+data_2 <- na.omit(data_2)
+```
+
+```{r}
+data_2$netinum=as.numeric(as.character(data_2$netinum))
+```
+
+
+# Calculating the total income for each country
+
+Now I need to know the total income for each country.
+
+```{r}
+xtabs(netinum ~ cntry, data_2)
+```
+
+* There are many zeros in the table because I have filtered the dataset for only eight countries, so just do not pay attention to zeros. 
+
+* The next step is finding out the number of people for each country (in the sample).
+
+# Finding out the number of people for each country
+
+```{r}
+data_2 %>%
+  group_by(cntry) %>%
+  summarise(count = n()) %>%
+  arrange(desc(count))
+```
+
+**I would like to calculate UBI for the countries with bigger population first.** I am going to do it manually, because I have failed to find a way to do it properly without bugs. 
+
+# Calculating UBI for each country
+
+**Germany**
+
+```{r}
+7526682 * 0.4 / 1733
+```
+UBI for Germany would be 1737.
+
+**Finland**
+
+```{r}
+6203303 * 0.4 / 1542
+```
+UBI for Finland would be 1609, smaller than for Germany.
+
+**United Kingdom**
+
+```{r}
+9468681 * 0.4 / 1538
+```
+For UK universal basic income would be really high, 2462.
+
+**Denmark**
+
+```{r}
+60317120 * 0.4 / 1334
+```
+Well, in my previous work for the second task I have noticed that something wrong with the data from Denmark, there is a high income inequality in this country according to Lorenz curve and Gini coefficients (0.7), which is highly unexpected result as Denmark is a country with social-democratic type of welfare state. But probably although European Social Survey's sample is representative, it is not the same when we know income of approximately every person as usually official income statistics does. So, some unexpected results for such robust estimation as income inequality is normal for social surveys I guess. 
+
+Therefore, for Denmark the UBI would be 18086.
+
+**Sweden**
+
+```{r}
+28006926 * 0.4 / 1323
+```
+For Sweden UBI would be also significantly high, 8467. But Gini Coefficient (0.3) indicates that there is a small income inequality in Sweden, so I can suppose that approximately every person is pretty well-off in this country according to the sample. 
+
+**Spain**
+
+```{r}
+3268960 * 0.4 / 1022
+```
+For Spain UBI would be the smallest among what I have already calculated - 1279.
+
+**Bulgaria**
+
+```{r}
+473996 * 0.4 /  956
+```
+Well, well, well... for Bulgaria the UBI would be very small - 198. 
+
+**Slovenia**
+
+```{r}
+790382 * 0.4 /  940
+```
+For Slovenia UBI is also very small - 336, but more than for Bulgaria.
+
+# Lorenz curve for eight countries before introduction of UBI
+
+```{r include=TRUE, message=FALSE, warning=FALSE}
+countries <- c("Finland", "Sweden", "Denmark", "Slovenia", "Germany",
+                    "United Kingdom", "Bulgaria", "Spain")
+par(mfrow=c(2, 4))
+for (i in countries) {
+  country <- data_2 %>%
+    filter(cntry == i)
+  
+  curveLorenz(country$netinum, col = 'red')
+  title(paste('Country', i))
+}
+```
+
+# Gini coefficients for eight countries before introduction of UBI
+
+```{r include=TRUE, message=FALSE, warning=FALSE}
+ginicities <- aggregate(netinum ~ cntry,
+                        data = data_2,
+                        FUN = "gini")
+names(ginicities) <- c("countries", "gini")
+knitr::kable(ginicities %>% 
+        arrange(gini), align = 'l')
+```
+
+
+
+# Lorenz curve before introduction of UBI VS Lorenz curve after introduction of UBI for each country and analysis of change in Gini coefficients
+
+**Germany - before policy**
+
+```{r}
+germany <- filter(data_2, cntry == 'Germany')
+  curveLorenz(germany$netinum, col = 'red')
+```
+
+**Germany - after policy**
+
+```{r}
+germany_ubi <- germany$netinum * 0.6 + 1737
+ curveLorenz(germany_ubi, col = 'red')
+```
+
+From the difference between two Lorenz curves, I can say that such policy would be able to reduce income inequality in Germany. 
+
+* Before the policy 50% of population in Germany possesses only approximately 10% of total income.
+
+* After the policy 50% of population in Germany possesses 30% of total income.
+
+*Gini coefficient*
+
+```{r}
+library(ineq)
+ineq(germany_ubi,type="Gini")
+```
+
+Before the policy, gini coefficient for Germany equals to 0.7. After the introduction of UBI, gini coefficient is 0.4. Big change! After the policy Germany has become closer to the equality of income. 
+
+**Finland - before policy**
+
+```{r}
+finland <- filter(data_2, cntry == 'Finland')
+  curveLorenz(finland$netinum, col = 'red')
+```
+
+**Finland - after policy**
+
+```{r}
+finland <- filter(data_2, cntry == 'Finland')
+finland_ubi <- finland$netinum * 0.6 + 1609
+ curveLorenz(finland_ubi, col = 'red')
+
+```
+
+Here we can also see that Lorenz curve has become closer to the line of perfect equality after the introduction of UBI.
+
+* Before the policy 50% of population in Finland possesses approximately 12% of total income.
+
+* After the policy 50% of population in Finland possesses approximately 35% of total income.
+
+*Gini coefficient*
+
+```{r}
+ineq(finland_ubi,type="Gini")
+```
+Without the policy, gini coefficient was equal to 0.64, but after the policy it is 0.38. 
+
+**UK - before policy**
+
+```{r}
+uk <- filter(data_2, cntry == 'United Kingdom')
+ curveLorenz(uk$netinum, col = 'red')
+```
+
+**UK - after policy**
+
+```{r}
+uk_ubi <- uk$netinum * 0.6 + 2462
+ curveLorenz(uk_ubi, col = 'red')
+```
+
+Very big change!
+
+* Before the policy 50% of population in UK possesses approximately 5% of total income.
+
+* After the policy 50% of population in Finland possesses approximately 30% of total income.
+
+*Gini coefficient*
+
+```{r}
+ineq(uk_ubi,type="Gini")
+```
+
+After the policy, gini coefficient in the UK equals to 0.39 - close to Finland! Big change considering that UK is the most unequal country in terms of income distribution (0.78) among eight countries under analysis. 
+
+
+**Denmark - before policy**
+
+```{r}
+denmark <- filter(data_2, cntry == 'Denmark')
+ curveLorenz(denmark$netinum, col = 'red')
+```
+
+**Denmark - after policy**
+
+```{r}
+denmark_ubi <- denmark$netinum * 0.6 + 18086
+ curveLorenz(uk_ubi, col = 'red')
+```
+
+Again - big change! This is also due to the fact that UBI for Denmark is 18 thousands dollars (total income in this country is super huge according to the sample).
+
+*Gini coefficient*
+
+```{r}
+ineq(denmark_ubi,type="Gini")
+```
+
+Denmark's gini coefficient before policy is 0.7. After the policy it is 0.42!
+
+**Sweden - before policy**
+
+```{r}
+sweden <- filter(data_2, cntry == 'Sweden')
+ curveLorenz(sweden$netinum, col = 'red')
+```
+
+Yeah, Sweden is the country with low income inequality even without the policy (gini - 0.3).
+
+**Sweden - after policy**
+
+```{r}
+sweden_ubi <- sweden$netinum * 0.6 + 8467
+ curveLorenz(sweden_ubi, col = 'red')
+```
+
+Well, Sweden is very very close to the case of perfect equality after the introduction of UBI. UBI is also super high - 8467.
+
+*Gini coefficient*
+
+```{r}
+ineq(sweden_ubi,type="Gini")
+```
+
+Sweden has become even closer to the perfect equality (0.18) than before (0.3).
+
+**Spain - before policy**
+
+```{r}
+spain <- filter(data_2, cntry == 'Spain')
+ curveLorenz(spain$netinum, col = 'red')
+```
+
+High income inequality in Spain...
+
+**Spain - after policy**
+
+```{r}
+spain_ubi <- spain$netinum * 0.6 + 1279
+ curveLorenz(spain_ubi, col = 'red')
+```
+
+Spain has become closer to the income equality!
+
+*Gini coefficient*
+
+```{r}
+ineq(spain_ubi,type="Gini")
+```
+
+Well, introduction of UBI change the situation with income inequality in Spain significantly. Before the policy gini coefficient was 0.70, after it is 0.42. Pretty important change!
+
+**Bulgaria - before policy**
+
+```{r}
+bulgaria <- filter(data_2, cntry == 'Bulgaria')
+ curveLorenz(bulgaria$netinum, col = 'red')
+```
+
+**Bulgaria - after policy**
+
+```{r}
+bulgaria_ubi <- bulgaria$netinum * 0.6 + 198
+ curveLorenz(bulgaria_ubi, col = 'red')
+```
+
+Although small UBI, I can see that introduction of the policy has changed Lorenz curve pretty well. This is because people in Bulgaria are not well-off and it seems that there no outliers in income as total income for this country for the sample is 473996 (the smallest among all eight countries). So, 198 dollars for each person change the situation with equality. 
+
+*Gini coefficient*
+
+```{r}
+ineq(bulgaria_ubi,type="Gini")
+```
+
+Before the policy gini was equal to 0.34, after it is 0.21. The same pattern as for Sweden.
+
+**Slovenia - before policy**
+
+```{r}
+slovenia <- filter(data_2, cntry == 'Slovenia')
+ curveLorenz(slovenia$netinum, col = 'red')
+```
+
+
+
+**Slovenia - after policy**
+
+```{r}
+slovenia_ubi <- slovenia$netinum * 0.6 + 336
+ curveLorenz(slovenia_ubi, col = 'red')
+```
+
+The same situation as with Bulgaria - small UBI makes the difference as country is not rich in terms of income of its citizens (790382).
+
+*Gini coefficient*
+
+```{r}
+ineq(slovenia_ubi,type="Gini")
+```
+
+Before the policy gini coefficient was equal to 0.28, after the policy it is 0.17.
+
+
+The end!
